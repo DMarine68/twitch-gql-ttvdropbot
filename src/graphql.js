@@ -25,7 +25,7 @@ const GraphQL = {
     retrytimeout: 60000,
     maxretries: 4,
 
-    SendQuery: async (QueryName, variables = null, sha256Hash = '', OAuth = '', preset = false, Headers = {}, Integrity = false) => {
+    SendQuery: async (QueryName, variables = null, sha256Hash = '', OAuth = '', preset = false, Headers = {}, Integrity = false, clientSessionId = '') => {
         let body = {variables}
         let Hash = (sha256Hash === '') ? Operation_Hashes[QueryName] : sha256Hash
 
@@ -67,6 +67,10 @@ const GraphQL = {
                     deviceId = value[0]
                 }
             })
+            
+            if (clientSessionId !== '') {
+                session = clientSessionId
+            }
 
             let htmlReg = new RegExp('twilightBuildID="([-a-z0-9]+)"')
             let rawdata = await response.text()
