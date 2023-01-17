@@ -1,5 +1,5 @@
-const fs = require("fs");
-const fetch = require("node-fetch")
+const fs = require('fs')
+const fetch = require('node-fetch')
 
 const Operation_Hashes = {
     'CollectionSideBar': '27111f1b382effad0b6def325caef1909c733fe6a4fbabf54f8d491ef2cf2f14',
@@ -15,63 +15,63 @@ const Operation_Hashes = {
     'ChatClip': '9aa558e066a22227c5ef2c0a8fded3aaa57d35181ad15f63df25bff516253a90',
     'UseLive': '639d5f11bfb8bf3053b424d9ef650d04c4ebb7d94711d644afb08fe9a0fad5d9',
     'DirectoryPage_Game': 'd5c5df7ab9ae65c3ea0f225738c08a36a4a76e4c6c31db7f8c4b8dc064227f9e',
-    'ViewerDropsDashboard': 'e8b98b52bbd7ccd37d0b671ad0d47be5238caa5bea637d2a65776175b4a23a64'
-};
+    'ViewerDropsDashboard': 'e8b98b52bbd7ccd37d0b671ad0d47be5238caa5bea637d2a65776175b4a23a64',
+}
 
 const GraphQL = {
-    Endpoint: "https://gql.twitch.tv/gql",
+    Endpoint: 'https://gql.twitch.tv/gql',
     ClientID: null,
     retries: 0,
     retrytimeout: 60000,
     maxretries: 4,
 
-    SendQuery: async (QueryName, variables = null, sha256Hash = '', OAuth = '',  preset = false, Headers  = {}, Integrity = false) => {
-        let body = { variables };
+    SendQuery: async (QueryName, variables = null, sha256Hash = '', OAuth = '', preset = false, Headers = {}, Integrity = false) => {
+        let body = {variables}
         let Hash = (sha256Hash === '') ? Operation_Hashes[QueryName] : sha256Hash
-    
-        if (!GraphQL.ClientID)
-            throw "Please make sure to fill in a ClientID";
-        
+
+        if (!GraphQL.ClientID) {
+            throw 'Please make sure to fill in a ClientID'
+        }
+
         if (!preset) {
-            body.query = fs.readFileSync(`${__dirname}/../queries/${QueryName}.gql`, "UTF-8");
-        }
-        else {
-            body.operationName = QueryName;
+            body.query = fs.readFileSync(`${__dirname}/../queries/${QueryName}.gql`, 'UTF-8')
+        } else {
+            body.operationName = QueryName
             body.extensions = {
-                "persistedQuery": {
-                    "version":1,
-                    "sha256Hash": Hash
-                }
-            };
-            body = [body];
+                'persistedQuery': {
+                    'version': 1,
+                    'sha256Hash': Hash,
+                },
+            }
+            body = [body]
         }
-        let integriheaders = {}
-        
+        let integrityHeaders = {}
+
         if (Integrity) {
             //Integrity
             let session = ''
-            let deviceid = ''
+            let deviceId = ''
             let version = ''
             let integrity = ''
 
             //session + device + client
-            const response = await fetch('https://twitch.tv');
-            let cookies = response.headers.raw()["set-cookie"]
+            const response = await fetch('https://twitch.tv')
+            let cookies = response.headers.raw()['set-cookie']
 
             cookies.forEach((cookie) => {
                 if (cookie.startsWith('server_session_id')) {
-                    let value = cookie.match(/(?<=\=)\w+(?=\;)/g) || [];
+                    let value = cookie.match(/(?<=\=)\w+(?=\;)/g) || []
                     session = value[0]
                 } else if (cookie.startsWith('unique_id') && !cookie.startsWith('unique_id_durable')) {
-                    let value = cookie.match(/(?<=\=)\w+(?=\;)/g) || [];
-                    deviceid = value[0]
+                    let value = cookie.match(/(?<=\=)\w+(?=\;)/g) || []
+                    deviceId = value[0]
                 }
             })
 
             let htmlReg = new RegExp('twilightBuildID="([-a-z0-9]+)"')
             let rawdata = await response.text()
-            let clientversion = htmlReg.exec(rawdata.toString())
-            version = clientversion[1]
+            let clientVersion = htmlReg.exec(rawdata.toString())
+            version = clientVersion[1]
 
             //integrity
 
@@ -82,61 +82,78 @@ const GraphQL = {
                     'Content-Type': 'application/json',
                     'Client-ID': GraphQL.ClientID,
                     'Client-Session-Id': session,
-                    'X-Device-Id': deviceid,
+                    'X-Device-Id': deviceId,
                     'Client-Version': version,
-                    'Authorization': OAuth
-                }
-            });
-            const data = await result.json();
+                    'Authorization': OAuth,
+                },
+            })
+            const data = await result.json()
             integrity = data.token
 
-            integriheaders = {
+            integrityHeaders = {
                 'Client-Session-Id': session,
                 'Client-Integrity': integrity,
-                'X-Device-Id': deviceid,
-                'Client-Version': version
+                'X-Device-Id': deviceId,
+                'Client-Version': version,
             }
         }
 
         let GraphGQLResponse = {}
         
+        let allHeaders = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:98.0) Gecko/20100101 Firefox/98.0',
+            'Authorization': OAuth,
+            'Client-Id': GraphQL.ClientID,
+            ...integrityHeaders,
+            ...Headers,
+        }
+        
+        console.log(allHeaders)
+        console.log(JSON.stringify(body))
+
         try {
             const GraphGQLRequest = await fetch(GraphQL.Endpoint, {
                 method: 'post',
                 body: JSON.stringify(body),
                 headers: {
-                    "Content-Type": 'application/json',
+                    'Content-Type': 'application/json',
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:98.0) Gecko/20100101 Firefox/98.0',
-                    "Authorization": OAuth,
-                    "Client-Id": GraphQL.ClientID,
-                    ...integriheaders,
-                    ...Headers
-                }
-            });
-            GraphGQLResponse = await GraphGQLRequest.json();
+                    'Authorization': OAuth,
+                    'Client-Id': GraphQL.ClientID,
+                    ...integrityHeaders,
+                    ...Headers,
+                },
+            })
+            
+            GraphGQLResponse = await GraphGQLRequest.json()
         } catch (error) {
+            console.error(error.message)
             return await errorHandler(error, QueryName, variables, sha256Hash, OAuth, preset)
         }
-        
+
         if (GraphGQLResponse.errors || (GraphGQLResponse[0] && GraphGQLResponse[0].errors) || GraphGQLResponse.error) {
             return await errorHandler(GraphGQLResponse, QueryName, variables, sha256Hash, OAuth, preset)
         }
-        GraphQL.retries = 0;
+        
+        GraphQL.retries = 0
         return GraphGQLResponse
-    }
+    },
 }
 
 async function errorHandler(error, QueryName, variables, sha256Hash, OAuth, preset) {
     if (GraphQL.retries < GraphQL.maxretries) {
         GraphQL.retries++
+        
         if (error instanceof Array) {
-            console.log("GQL RESPONSE ERROR! " + QueryName + " Request Failed... Retrying in " + (GraphQL.retrytimeout/1000) + " seconds... Try: " + GraphQL.retries + "/" + GraphQL.maxretries)
+            console.log('GQL RESPONSE ERROR! ' + QueryName + ' Request Failed... Retrying in ' + (GraphQL.retrytimeout / 1000) + ' seconds... Try: ' + GraphQL.retries + '/' + GraphQL.maxretries)
         } else {
-            console.log("GQL ERROR! " + QueryName + " Request Failed... Retrying in " + (GraphQL.retrytimeout / 1000) + " seconds... Try: " + GraphQL.retries + "/" + GraphQL.maxretries)
-            console.log("With GQL Error! Errno: " + error.errno + " Code: " + error.code + " Syscall: " + error.syscall + " Hostname: " + error.hostname)
+            console.log('GQL ERROR! ' + QueryName + ' Request Failed... Retrying in ' + (GraphQL.retrytimeout / 1000) + ' seconds... Try: ' + GraphQL.retries + '/' + GraphQL.maxretries)
+            console.log('With GQL Error! Errno: ' + error.errno + ' Code: ' + error.code + ' Syscall: ' + error.syscall + ' Hostname: ' + error.hostname)
         }
+        
         await delay(GraphQL.retrytimeout)
-        return await GraphQL.SendQuery(QueryName, variables, sha256Hash, OAuth, preset);
+        return await GraphQL.SendQuery(QueryName, variables, sha256Hash, OAuth, preset)
     } else {
         if (error.code === undefined) {
             if (error instanceof Array) {
@@ -145,13 +162,13 @@ async function errorHandler(error, QueryName, variables, sha256Hash, OAuth, pres
                 throw error
             }
         } else {
-            throw "GQL Error! Errno: " + error.errno + " Code: " + error.code + " Syscall: " + error.syscall + " Hostname: " + error.hostname
+            throw 'GQL Error! Errno: ' + error.errno + ' Code: ' + error.code + ' Syscall: ' + error.syscall + ' Hostname: ' + error.hostname
         }
     }
 }
 
 async function delay(ms) {
-    return await new Promise(resolve => setTimeout(resolve, ms));
+    return await new Promise(resolve => setTimeout(resolve, ms))
 }
 
 module.exports = GraphQL;
