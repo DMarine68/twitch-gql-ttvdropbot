@@ -18,6 +18,13 @@ const Operation_Hashes = {
     'ViewerDropsDashboard': 'e8b98b52bbd7ccd37d0b671ad0d47be5238caa5bea637d2a65776175b4a23a64',
 }
 
+function clientSessionID() {
+    return 'xxxxxxxxxxxxxxxx'.replace(/[xy]/g, (function (e) {
+        let t = 16 * Math.random() | 0
+        return ('x' === e ? t : 3 & t | 8).toString(16)
+    }))
+}
+
 const GraphQL = {
     Endpoint: 'https://gql.twitch.tv/gql',
     ClientID: null,
@@ -25,7 +32,7 @@ const GraphQL = {
     retrytimeout: 60000,
     maxretries: 4,
 
-    SendQuery: async (QueryName, variables = null, sha256Hash = '', OAuth = '', preset = false, Headers = {}, Integrity = false, clientSessionId = '') => {
+    SendQuery: async (QueryName, variables = null, sha256Hash = '', OAuth = '', preset = false, Headers = {}, Integrity = false) => {
         let body = {variables}
         let Hash = (sha256Hash === '') ? Operation_Hashes[QueryName] : sha256Hash
 
@@ -49,7 +56,7 @@ const GraphQL = {
 
         if (Integrity) {
             //Integrity
-            let session = ''
+            let session = clientSessionID()
             let deviceId = ''
             let version = ''
             let integrity = ''
@@ -61,16 +68,12 @@ const GraphQL = {
             cookies.forEach((cookie) => {
                 if (cookie.startsWith('server_session_id')) {
                     let value = cookie.match(/(?<=\=)\w+(?=\;)/g) || []
-                    session = value[0]
+                    //session = value[0]
                 } else if (cookie.startsWith('unique_id') && !cookie.startsWith('unique_id_durable')) {
                     let value = cookie.match(/(?<=\=)\w+(?=\;)/g) || []
                     deviceId = value[0]
                 }
             })
-            
-            if (clientSessionId !== '') {
-                session = clientSessionId
-            }
 
             let htmlReg = new RegExp('twilightBuildID="([-a-z0-9]+)"')
             let rawdata = await response.text()
@@ -103,7 +106,7 @@ const GraphQL = {
         }
 
         let GraphGQLResponse = {}
-        
+
         let allHeaders = {
             'Content-Type': 'application/json',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:98.0) Gecko/20100101 Firefox/98.0',
@@ -112,7 +115,7 @@ const GraphQL = {
             ...integrityHeaders,
             ...Headers,
         }
-        
+
         console.log(allHeaders)
         console.log(JSON.stringify(body))
 
@@ -129,7 +132,7 @@ const GraphQL = {
                     ...Headers,
                 },
             })
-            
+
             GraphGQLResponse = await GraphGQLRequest.json()
         } catch (error) {
             console.error(error.message)
@@ -139,7 +142,7 @@ const GraphQL = {
         if (GraphGQLResponse.errors || (GraphGQLResponse[0] && GraphGQLResponse[0].errors) || GraphGQLResponse.error) {
             return await errorHandler(GraphGQLResponse, QueryName, variables, sha256Hash, OAuth, preset)
         }
-        
+
         GraphQL.retries = 0
         return GraphGQLResponse
     },
@@ -148,14 +151,14 @@ const GraphQL = {
 async function errorHandler(error, QueryName, variables, sha256Hash, OAuth, preset) {
     if (GraphQL.retries < GraphQL.maxretries) {
         GraphQL.retries++
-        
+
         if (error instanceof Array) {
             console.log('GQL RESPONSE ERROR! ' + QueryName + ' Request Failed... Retrying in ' + (GraphQL.retrytimeout / 1000) + ' seconds... Try: ' + GraphQL.retries + '/' + GraphQL.maxretries)
         } else {
             console.log('GQL ERROR! ' + QueryName + ' Request Failed... Retrying in ' + (GraphQL.retrytimeout / 1000) + ' seconds... Try: ' + GraphQL.retries + '/' + GraphQL.maxretries)
             console.log('With GQL Error! Errno: ' + error.errno + ' Code: ' + error.code + ' Syscall: ' + error.syscall + ' Hostname: ' + error.hostname)
         }
-        
+
         await delay(GraphQL.retrytimeout)
         return await GraphQL.SendQuery(QueryName, variables, sha256Hash, OAuth, preset)
     } else {
@@ -175,4 +178,4 @@ async function delay(ms) {
     return await new Promise(resolve => setTimeout(resolve, ms))
 }
 
-module.exports = GraphQL;
+module.exports = GraphQL

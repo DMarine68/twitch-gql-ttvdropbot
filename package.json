@@ -1,6 +1,6 @@
 {
   "name": "@dmarine68/twitch-gql-ttvdropbot",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "description": "Allows interaction with Twitch inner GQL, modified for TTVDropBot",
   "main": "index.js",
   "publishConfig": {
